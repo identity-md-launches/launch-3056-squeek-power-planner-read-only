@@ -1,0 +1,77 @@
+import assert from 'node:assert/strict';
+import { harness, curlBridge, assertReflow } from './browser-support.mjs';
+const h = await harness();
+const failures = [];
+try {
+ const context = await h.browser.newContext({ viewport: { width: 1440, height: 1000 }, permissions: ['clipboard-read', 'clipboard-write'] });
+ if (process.env.PLANNER_CURL_BRIDGE === '1') await curlBridge(context);
+ const page = await context.newPage();
+ page.on('pageerror', e => failures.push(e.message));
+ page.on('request', req => { if (req.method() === 'POST' && /eth_send|wallet_send|personal_sign|eth_sign/.test(req.postData() ?? '')) failures.push('Forbidden write/sign RPC: ' + req.url()); });
+ await page.goto(h.url);
+ await page.getByRole('button', { name: 'View public reserve' }).click();
+ await page.getByRole('heading', { name: 'Squeek #8889', exact: true }).waitFor({ timeout: 45000 });
+ await page.locator('.token-image > img').first().waitFor({ timeout: 30000 });
+ await assertReflow(page, 'live reserve');
+ await page.setViewportSize({ width: 1440, height: 1000 });
+ await page.screenshot({ path: 'test/scratch/shots/live-reserve-1440.png', fullPage: true });
+ console.log('PASS live API wallet, contract-sourced NFT images, source labels, and reflow');
+ await page.getByRole('link', { name: 'Simulator', exact: true }).click();
+ await page.locator('.deposit-row').filter({ hasText: 'Squeek #8990' }).getByRole('checkbox').check();
+ await page.getByRole('button', { name: 'Prepare next unsigned call' }).click();
+ await page.getByText('Simulation passed', { exact: true }).waitFor({ timeout: 60000 });
+ const deposit = JSON.parse(await page.locator('.prepared pre').innerText());
+ assert.equal(deposit.chainId, '0xaa36a7');
+ assert.equal(deposit.calls[0].to.toLowerCase(), '0xc4c7982657f00509548f3a3a41db7fa439a6856b');
+ assert(deposit.calls[0].data.startsWith('0x42842e0e'));
+ console.log('PASS live deployment verification, ownership read, and safe-transfer deposit simulation');
+ await page.screenshot({ path: 'test/scratch/shots/live-deposit-call-1440.png', fullPage: true });
+ await page.getByRole('button', { name: 'Reset plan', exact: true }).click();
+ await page.getByRole('button', { name: 'Merge', exact: true }).click();
+ await page.getByLabel('Survivor', { exact: true }).selectOption('8990');
+ await page.getByLabel('Donor', { exact: true }).selectOption('8991');
+ await page.getByLabel('Include this merge in the plan').check();
+ await page.getByLabel('I understand that #8991').check();
+ await page.getByRole('button', { name: 'Prepare next unsigned call' }).click();
+ await page.getByText('Simulation passed', { exact: true }).waitFor({ timeout: 60000 });
+ const merge = JSON.parse(await page.locator('.prepared pre').innerText());
+ assert.equal(merge.calls[0].to.toLowerCase(), '0xc4c7982657f00509548f3a3a41db7fa439a6856b');
+ console.log('PASS live same-level/cooldown/ownership verification and wallet-held merge simulation');
+ await page.getByRole('button', { name: 'Reset plan', exact: true }).click();
+ await page.getByRole('button', { name: 'Stake', exact: true }).click();
+ await page.getByLabel('Amount in SQK').fill('1');
+ await page.getByRole('button', { name: 'Prepare next unsigned call' }).click();
+ await page.getByText('Simulation passed', { exact: true }).waitFor({ timeout: 60000 });
+ const stake = JSON.parse(await page.locator('.prepared pre').innerText());
+ assert(['0xd78a3956cf63164d1fa1c622ad3c66623162fa1e', '0x50fd1780526c3186a0c037c7622203bc4fb611ca'].includes(stake.calls[0].to.toLowerCase()));
+ console.log('PASS live token balance/allowance read and exact-amount approval or stake simulation');
+
+ // Public staker discovered from the official /squeeks/4001 API custody record.
+ await page.getByLabel('Sepolia wallet address').fill('0xbb97ae918a92eafe81304e1829eacb0da0c66e47');
+ await page.getByRole('button', { name: 'View wallet', exact: true }).click();
+ await page.locator('.viewing').filter({ hasText: /0xbB97|0xbb97/i }).waitFor();
+ await page.getByRole('button', { name: 'Unstake', exact: true }).click();
+ await page.getByLabel('Amount in SQK').fill('1');
+ await page.getByRole('button', { name: 'Quote exit fee', exact: true }).click();
+ await page.getByText('Quote ready', { exact: true }).waitFor({ timeout: 60000 });
+ console.log('Live exit quote:', (await page.locator('.exit-quote').innerText()).replaceAll('\n', ' | '));
+ await page.getByLabel('I accept burning up to').check();
+ await page.getByRole('button', { name: 'Prepare next unsigned call' }).click();
+ await page.getByText('Simulation passed', { exact: true }).waitFor({ timeout: 60000 });
+ const unstake = JSON.parse(await page.locator('.prepared pre').innerText());
+ assert.equal(unstake.calls[0].to.toLowerCase(), '0x50fd1780526c3186a0c037c7622203bc4fb611ca');
+
+ await page.getByRole('button', { name: 'Copy unsigned call', exact: true }).click();
+ assert.deepEqual(JSON.parse(await page.evaluate(()=>navigator.clipboard.readText())), unstake);
+ console.log('PASS live mature stake, quoted burn/net, accepted maxFee and deadline, unstake simulation, and exact clipboard bundle');
+
+ await page.setViewportSize({ width: 390, height: 844 });
+ await assertReflow(page, 'live unstake quote', [320,390]);
+ await page.evaluate(() => window.scrollTo(0, 0));
+ await page.screenshot({ path: 'test/scratch/shots/live-unstake-390.png', fullPage: true });
+ await page.setViewportSize({ width: 1440, height: 1000 });
+ await page.getByRole('link', { name: 'Network', exact: true }).click();
+ await page.screenshot({ path: 'test/scratch/shots/live-network-1440.png', fullPage: true });
+ assert.deepEqual(failures, []);
+ console.log('PASS no app errors or signing/broadcast requests; no transactions sent');
+} finally { await h.close(); }

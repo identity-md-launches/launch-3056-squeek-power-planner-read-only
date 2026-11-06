@@ -1,0 +1,34 @@
+{
+  "name": "squeek-power-planner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:browser": "node tests/browser.mjs",
+    "test:wallet": "node tests/wallet-browser.mjs",
+    "test:live": "node tests/live-browser.mjs",
+    "test:a11y": "node tests/a11y-browser.mjs"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "viem": "^2.38.0",
+    "wagmi": "^3.7.11",
+    "@coinbase/wallet-sdk": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.2.0",
+    "playwright": "^1.58.0",
+    "axe-core": "^4.11.0"
+  }
+}

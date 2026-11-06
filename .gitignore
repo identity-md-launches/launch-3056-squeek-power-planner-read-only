@@ -1,0 +1,11 @@
+# Explicit path budget: artifacts/bundle-budget.md (.gitignore <= 1,024 bytes).
+!/artifacts/
+!/artifacts/**
+**/node_modules/
+**/.cache/
+**/.npm/
+**/.vite/
+**/coverage/
+**/*.tsbuildinfo
+test/scratch/
+# dist/ is a required deliverable and is intentionally not ignored.
